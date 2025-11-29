@@ -1,0 +1,15 @@
+{
+  "/api": {
+    "target": "https://datahub.io",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "pathRewrite": {
+      "^/api": ""
+    },
+    "headers": {
+      "Accept": "text/csv, application/json, */*"
+    }
+  }
+}
+
