@@ -31,7 +31,6 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
     effect(() => {
       const data = this.chartData();
       let chartTitle = this.title();
-      
       // Calculate start and end years from labels if they are years
       const labels = data.labels;
       if (labels && labels.length > 0) {
@@ -39,11 +38,9 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
         const numericLabels = labels
           .map(label => parseInt(label.toString(), 10))
           .filter(year => !isNaN(year) && year >= 1900 && year <= 2100);
-        
         if (numericLabels.length > 0) {
           const startYear = Math.min(...numericLabels);
           const endYear = Math.max(...numericLabels);
-          
           // Update title with actual year range
           // If title already contains a year range pattern (YYYY-YYYY), replace it
           const yearRangePattern = /\((\d{4})-(\d{4})\)/;
@@ -60,10 +57,10 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
           }
         }
       }
-      
       // Read responsive signals to trigger effect on screen size change
       const mobile = this.isMobile();
       const tablet = this.isTablet();
+      let xAxisRotate = 0;
 
       // Responsive configuration
       const titleFontSize = mobile ? 14 : tablet ? 16 : 18;
@@ -71,24 +68,42 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
       const axisNameFontSize = mobile ? 11 : tablet ? 12 : 13;
       const gridLeft = mobile ? '8%' : tablet ? '5%' : '3%';
       const gridRight = mobile ? '5%' : tablet ? '4%' : '4%';
-      const gridBottom = mobile ? '15%' : tablet ? '10%' : '8%';
+      // Increase bottom margin when labels are rotated to prevent overlap
+      const gridBottom = xAxisRotate > 0
+        ? (mobile ? '20%' : tablet ? '15%' : '12%')
+        : (mobile ? '15%' : tablet ? '10%' : '8%');
       const nameGapX = mobile ? 20 : tablet ? 25 : 30;
       const nameGapY = mobile ? 40 : tablet ? 50 : 60;
 
       // Calculate x-axis label interval based on screen size and data length
       const labelCount = data.labels.length;
-      let xAxisInterval = 0;
-      let xAxisRotate = 0;
+      let xAxisInterval: number | 'auto' = 0;
+      let xAxisMargin = mobile ? 8 : 10;
 
-      if (mobile) {
-        xAxisInterval = labelCount > 10 ? Math.floor(labelCount / 8) : 0;
-        xAxisRotate = labelCount > 15 ? 45 : labelCount > 10 ? 30 : 0;
-      } else if (tablet) {
-        xAxisInterval = labelCount > 20 ? Math.floor(labelCount / 10) : 0;
-        xAxisRotate = labelCount > 25 ? 45 : labelCount > 20 ? 30 : 0;
+      // Calculate optimal interval to prevent overlap
+      // Estimate average label width (assuming 4-5 characters per label)
+      const estimatedLabelWidth = 40; // pixels
+      const chartWidth = mobile ? 300 : tablet ? 600 : 1200; // approximate chart width
+      const maxLabelsVisible = Math.floor(chartWidth / estimatedLabelWidth);
+
+      if (labelCount > maxLabelsVisible) {
+        // Calculate interval to show only maxLabelsVisible labels
+        xAxisInterval = Math.ceil(labelCount / maxLabelsVisible) - 1;
       } else {
-        xAxisInterval = labelCount > 30 ? Math.floor(labelCount / 10) : 0;
-        xAxisRotate = labelCount > 20 ? 45 : 0;
+        // Use auto interval if labels fit
+        xAxisInterval = 'auto';
+      }
+
+      // Apply rotation based on label count and screen size
+      if (mobile) {
+        xAxisRotate = labelCount > 8 ? 45 : labelCount > 5 ? 30 : 0;
+        xAxisMargin = labelCount > 10 ? 12 : 8;
+      } else if (tablet) {
+        xAxisRotate = labelCount > 15 ? 45 : labelCount > 10 ? 30 : 0;
+        xAxisMargin = labelCount > 20 ? 15 : 10;
+      } else {
+        xAxisRotate = labelCount > 25 ? 45 : labelCount > 15 ? 30 : 0;
+        xAxisMargin = labelCount > 30 ? 20 : 10;
       }
 
       const options: EChartsCoreOption = {
@@ -143,7 +158,9 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
             rotate: xAxisRotate,
             interval: xAxisInterval,
             fontSize: labelFontSize,
-            margin: mobile ? 8 : 10
+            margin: xAxisMargin,
+            // Prevent label overlap
+            overflow: 'none'
           },
           name: 'Year',
           nameLocation: 'middle',
