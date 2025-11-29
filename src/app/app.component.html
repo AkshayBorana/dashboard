@@ -44,7 +44,7 @@
 
     <div class="table-card">
       @if (tableData().length > 0) {
-        <app-table [data]="tableData()"></app-table>
+        <app-table [data]="tableData()" (pageChange)="onTablePageChange($event)"></app-table>
       } @else {
         <div class="loading">No table data available...</div>
       }
