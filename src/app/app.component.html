@@ -29,6 +29,17 @@
       }
     </div>
 
+    <div class="map-card">
+      @if (selectedCountryData() && selectedDisplayOption() === 'country') {
+        <app-maps 
+          [selectedCountryData]="selectedCountryData()!" 
+          [allPopulationData]="allPopulationData()">
+        </app-maps>
+      } @else {
+        <div class="loading">Select a country to view on map...</div>
+      }
+    </div>
+
     <div class="chart-card">
       @if (chartData().labels.length > 0) {
         <app-chart
