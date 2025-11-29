@@ -1,0 +1,135 @@
+.dashboard-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0;
+
+  h1 {
+    margin: 0 0 2rem 0;
+    padding: 0 2rem;
+    color: #333;
+    font-size: 2rem;
+    font-weight: 600;
+  }
+}
+
+.map-card,
+.data-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+// Container for chart and table sections
+.charts-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.chart-section,
+.table-section {
+  width: 100%;
+}
+
+.dropdown-section {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+// Mobile styles (up to 767px)
+@media screen and (max-width: 767px) {
+  .dashboard-container {
+    margin: 1rem auto;
+
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 1.5rem 0;
+      padding: 0 1rem;
+    }
+  }
+
+  .map-card,
+  .data-card {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .charts-table-container {
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .loading {
+    padding: 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+// Tablet styles (768px to 1023px)
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-container {
+    margin: 1.5rem auto;
+
+    h1 {
+      font-size: 1.75rem;
+      margin: 0 0 1.75rem 0;
+      padding: 0 1.5rem;
+    }
+  }
+
+  .map-card,
+  .data-card {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .charts-table-container {
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+}
+
+// Desktop styles (1024px and above)
+@media screen and (min-width: 1024px) {
+  .dashboard-container {
+    margin: 2rem auto;
+
+    h1 {
+      padding: 0 2rem;
+    }
+  }
+
+  .map-card,
+  .data-card {
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  // Display chart and table side by side on desktop
+  .charts-table-container {
+    flex-direction: row;
+    gap: 2rem;
+    margin-top: 2rem;
+    
+    .chart-section,
+    .table-section {
+      flex: 1;
+      width: auto;
+    }
+  }
+}
+
