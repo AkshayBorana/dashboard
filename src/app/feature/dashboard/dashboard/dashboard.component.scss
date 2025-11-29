@@ -49,6 +49,34 @@
   font-size: 1.1rem;
 }
 
+.error-message {
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 8px;
+  padding: 1rem 2rem;
+  margin-bottom: 2rem;
+  color: #c33;
+
+  p {
+    margin: 0 0 1rem 0;
+    font-weight: 500;
+  }
+
+  button {
+    background: #c33;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+
+    &:hover {
+      background: #a22;
+    }
+  }
+}
+
 // Mobile styles (up to 767px)
 @media screen and (max-width: 767px) {
   .dashboard-container {

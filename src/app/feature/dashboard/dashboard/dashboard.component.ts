@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, OnDestroy, inject, effect } from '@angular/core';
 import { PopulationService } from '../../../core/services/population.service';
 import { PopulationDataTransformerService } from '../../../core/services/population-data-transformer.service';
 import { DashboardDataService } from './dashboard-data.service';
@@ -6,7 +6,6 @@ import { ChartComponent } from '../../../shared/components/chart/chart.component
 import { DropdownComponent, DropdownOption } from '../../../shared/components/dropdown/dropdown.component';
 import { TableComponent } from '../../../shared/components/table/table.component';
 import { MapsComponent } from '../../../shared/components/maps/maps.component';
-import { forkJoin, Subject } from 'rxjs';
 import { PopulationData } from '../../../core/models/population-data.model';
 import {
   extractUniqueYears,
@@ -24,11 +23,9 @@ import {
 })
 
 export class DashboardComponent implements OnInit, OnDestroy {
-  private populationService: PopulationService = inject(PopulationService);
+  public populationService: PopulationService = inject(PopulationService);
   private populationDataTransformerService: PopulationDataTransformerService = inject(PopulationDataTransformerService);
   private dashboardDataService: DashboardDataService = inject(DashboardDataService);
-
-  private ngUnsubscribe$ = new Subject<void>();
 
   public dropdownOptions: DropdownOption[] = [
     { label: 'Country', value: 'country' },
@@ -60,19 +57,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   tableData = signal<PopulationData[]>([]);
   currentPage = signal<number>(1);
 
+  // Loading and error states from service
+  isLoading = computed(() => this.populationService.isLoading()());
+  error = computed(() => this.populationService.error()());
+
+  // Track if initial data has been loaded to prevent resetting user selections
+  private initialDataLoaded = signal<boolean>(false);
+
   // Selected country data with geo_point_2d and geo_shape for maps component
   selectedCountryData = computed(() => {
     return findCountryDataWithGeoInfo(this.allPopulationData(), this.selectedCountry());
   });
 
-  constructor() { }
+  constructor() {
+    // Effect to react to signal changes and merge data when both are available
+    effect(() => {
+      const populationData = this.populationService.populationData()();
+      const worldBoundaries = this.populationService.worldBoundaries()();
 
-  ngOnInit() {
-    forkJoin({
-      populationData: this.populationService.getPopulationData(),
-      worldBoundaries: this.populationService.getWorldBoundariesData()
-    }).subscribe({
-      next: ({ populationData, worldBoundaries }) => {
+      if (populationData && worldBoundaries && !this.initialDataLoaded()) {
         const mergedData = this.populationDataTransformerService.mergeDatasets(populationData, worldBoundaries);
 
         this.allPopulationData.set(mergedData);
@@ -83,18 +86,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.yearOptions.set(yearOptions);
         this.countryOptions.set(countryOptions);
 
-        // Set default country and process initial data
+        // Set default country and process initial data only on first load
         const defaultCountry = getFirstCountryName(mergedData);
         if (defaultCountry) {
           this.selectedCountry.set(defaultCountry);
           this.updateChartData(mergedData, defaultCountry);
           this.updateTableData(mergedData);
+          this.initialDataLoaded.set(true);
         }
-      },
-      error: (error) => {
-        console.error('Error fetching data:', error);
+      } else if (populationData && worldBoundaries && this.initialDataLoaded()) {
+        // If data is already loaded, just update the merged data without resetting selections
+        const mergedData = this.populationDataTransformerService.mergeDatasets(populationData, worldBoundaries);
+        this.allPopulationData.set(mergedData);
+        
+        // Update options without resetting selections
+        const yearOptions = extractUniqueYears(mergedData);
+        const countryOptions = extractUniqueCountryNames(mergedData);
+        this.yearOptions.set(yearOptions);
+        this.countryOptions.set(countryOptions);
       }
     });
+  }
+
+  ngOnInit() {
+    // Load data on component initialization
+    this.populationService.loadAllData();
   }
 
   /**
@@ -103,7 +119,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private updateChartData(data: PopulationData[], countryName: string | null = null): void {
     const chartData = this.dashboardDataService.processDataForChart(data, countryName);
     this.chartTitle.set(chartData.title);
-    this.fullChartData.set({ labels: chartData.labels, values: chartData.values });
+    // Create new object references to ensure signal updates are detected
+    this.fullChartData.set({
+      labels: [...chartData.labels],
+      values: [...chartData.values]
+    });
     this.currentPage.set(1);
     this.updatePaginatedChartData(1);
   }
@@ -114,7 +134,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private updateChartDataByYear(data: PopulationData[], year: string): void {
     const chartData = this.dashboardDataService.processDataByYear(data, year);
     this.chartTitle.set(chartData.title);
-    this.fullChartData.set({ labels: chartData.labels, values: chartData.values });
+    // Create new object references to ensure signal updates are detected
+    this.fullChartData.set({
+      labels: [...chartData.labels],
+      values: [...chartData.values]
+    });
     this.currentPage.set(1);
     this.updatePaginatedChartData(1);
   }
@@ -131,13 +155,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.selectedYear.set(null);
       const currentCountry = this.selectedCountry();
       if (currentCountry && allData.length > 0) {
+        this.updateChartData(allData, currentCountry);
         this.updateTableData(allData);
+      } else {
+        // If no country selected, use default
+        const defaultCountry = this.countryOptions()[0]?.value || null;
+        if (defaultCountry && allData.length > 0) {
+          this.selectedCountry.set(defaultCountry);
+          this.updateChartData(allData, defaultCountry);
+          this.updateTableData(allData);
+        }
       }
     } else if (value === 'year') {
       this.selectedCountry.set(null);
       const currentYear = this.selectedYear();
       if (currentYear && allData.length > 0) {
+        this.updateChartDataByYear(allData, currentYear);
         this.updateTableData(allData);
+      } else {
+        // If no year selected, use first available year
+        const defaultYear = this.yearOptions()[0]?.value || null;
+        if (defaultYear && allData.length > 0) {
+          this.selectedYear.set(defaultYear);
+          this.updateChartDataByYear(allData, defaultYear);
+          this.updateTableData(allData);
+        }
       }
     }
   }
@@ -204,11 +246,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private updatePaginatedChartData(page: number): void {
     const fullData = this.fullChartData();
     const paginatedData = paginateChartData(fullData, page, 10);
-    this.chartData.set(paginatedData);
+    // Create new object references to ensure signal updates are detected
+    this.chartData.set({
+      labels: [...paginatedData.labels],
+      values: [...paginatedData.values]
+    });
   }
 
   ngOnDestroy(): void {
-    this.ngUnsubscribe$.next();
-    this.ngUnsubscribe$.complete();
+    // No cleanup needed with signals
   }
 }

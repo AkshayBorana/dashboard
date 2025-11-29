@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, retry, switchMap } from 'rxjs/operators';
@@ -17,13 +17,19 @@ export class PopulationService {
 
   private http: HttpClient = inject(HttpClient);
 
+  // Signals for data storage
+  private populationDataSignal: WritableSignal<PopulationData[] | null> = signal<PopulationData[] | null>(null);
+  private worldBoundariesSignal: WritableSignal<any | null> = signal<any | null>(null);
+  private loadingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private errorSignal: WritableSignal<string | null> = signal<string | null>(null);
+
   constructor() {}
 
   /**
-   * Fetches population data from the API and converts CSV to JSON format
+   * Private method to fetch population data from the API and converts CSV to JSON format
    * @returns Observable of array of PopulationData objects
    */
-  getPopulationData(): Observable<PopulationData[]> {
+  private getPopulationData$(): Observable<PopulationData[]> {
     return this.http.get(this.apiUrl, { responseType: 'text' }).pipe(
       retry(2), // Retry up to 2 times on failure
       map((csvText: string) => {
@@ -58,11 +64,11 @@ export class PopulationService {
   }
 
   /**
-   * Fetches world administrative boundaries data from OpenDataSoft API
+   * Private method to fetch world administrative boundaries data from OpenDataSoft API
    * Handles pagination to fetch all entries using the total_count property
    * @returns Observable of the API response with all results combined
    */
-  getWorldBoundariesData(): Observable<any> {
+  private getWorldBoundariesData$(): Observable<any> {
     const limit = 100;
     const initCallUrl = `${this.boundariesApiBaseUrl}?limit=${limit}&offset=0`;
 
@@ -127,5 +133,60 @@ export class PopulationService {
         );
       })
     );
+  }
+
+  /**
+   * Loads all data (population and world boundaries) in parallel and updates signals
+   */
+  loadAllData(): void {
+    this.loadingSignal.set(true);
+    this.errorSignal.set(null);
+
+    forkJoin({
+      populationData: this.getPopulationData$(),
+      worldBoundaries: this.getWorldBoundariesData$()
+    }).subscribe({
+      next: ({ populationData, worldBoundaries }) => {
+        this.populationDataSignal.set(populationData);
+        this.worldBoundariesSignal.set(worldBoundaries);
+        this.loadingSignal.set(false);
+        this.errorSignal.set(null);
+      },
+      error: (error) => {
+        const errorMessage = error.message || 'Network error';
+        this.errorSignal.set(errorMessage);
+        this.loadingSignal.set(false);
+        console.error('Error loading data:', error);
+      }
+    });
+  }
+
+  // Public getters for signals
+  /**
+   * Returns the population data signal
+   */
+  populationData() {
+    return this.populationDataSignal.asReadonly();
+  }
+
+  /**
+   * Returns the world boundaries data signal
+   */
+  worldBoundaries() {
+    return this.worldBoundariesSignal.asReadonly();
+  }
+
+  /**
+   * Returns the loading state signal
+   */
+  isLoading() {
+    return this.loadingSignal.asReadonly();
+  }
+
+  /**
+   * Returns the error state signal
+   */
+  error() {
+    return this.errorSignal.asReadonly();
   }
 }

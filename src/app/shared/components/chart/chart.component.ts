@@ -30,7 +30,8 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
     // Effect to update chart options when data or screen size changes
     effect(() => {
       const data = this.chartData();
-      let chartTitle = this.title();
+      const chartTitleInput = this.title();
+      let chartTitle = chartTitleInput;
       // Calculate start and end years from labels if they are years
       const labels = data.labels;
       if (labels && labels.length > 0) {
@@ -205,6 +206,14 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
       };
 
       this.chartOptions.set(options);
+      
+      // Manually update the chart instance if it exists
+      // Use setTimeout to ensure the update happens after the current change detection cycle
+      setTimeout(() => {
+        if (this.echartsInstance) {
+          this.echartsInstance.setOption(options, true);
+        }
+      }, 0);
     });
   }
 
@@ -235,6 +244,11 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onChartInit(echartsInstance: ECharts): void {
     this.echartsInstance = echartsInstance;
+    // Set initial options when chart is initialized
+    const options = this.chartOptions();
+    if (options) {
+      echartsInstance.setOption(options, true);
+    }
   }
 
   private checkScreenSize(): void {
