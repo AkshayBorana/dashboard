@@ -29,22 +29,26 @@
       }
     </div>
 
-    @if (chartData().labels.length > 0) {
-      <app-chart
-        [chartData]="chartData()"
-        [title]="chartTitle()"
-        height="500px"
-        width="100%">
-      </app-chart>
-    } @else {
-      <div class="loading">Loading chart data...</div>
-    }
+    <div class="chart-card">
+      @if (chartData().labels.length > 0) {
+        <app-chart
+          [chartData]="chartData()"
+          [title]="chartTitle()"
+          height="500px"
+          width="100%">
+        </app-chart>
+      } @else {
+        <div class="loading">Loading chart data...</div>
+      }
+    </div>
 
-    @if (tableData().length > 0) {
-      <div class="table-section">
+    <div class="table-card">
+      @if (tableData().length > 0) {
         <app-table [data]="tableData()"></app-table>
-      </div>
-    }
+      } @else {
+        <div class="loading">No table data available...</div>
+      }
+    </div>
   </div>
 </main>
 

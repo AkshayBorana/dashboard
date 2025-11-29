@@ -1,1 +1,32 @@
 /* You can add global styles to this file, and also import other style files */
+/* Global font family for entire application */
+* {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  html, body {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Ensure PrimeNG components use the same font */
+  ::ng-deep {
+    .p-component,
+    .p-datatable,
+    .p-dropdown,
+    .p-button,
+    .p-inputtext,
+    .p-paginator {
+      font-family: 'Helvetica Neue', 'Arial', sans-serif !important;
+    }
+  }
+  
+  /* Ensure ECharts uses the same font */
+  ::ng-deep {
+    .echarts {
+      font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    }
+  }

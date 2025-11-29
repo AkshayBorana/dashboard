@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { catchError, map, retry } from 'rxjs/operators';
 
 export interface PopulationData {
   countryName: string;
@@ -35,7 +35,7 @@ export interface PopulationData {
 })
 export class PopulationService {
   // Using CORS proxy to bypass CORS restrictions
-  private readonly apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://datahub.io/core/population/_r/-/data/population.csv')}`;
+  private readonly apiUrl = '/api/core/population/_r/-/data/population.csv';
 
   // OpenDataSoft API endpoint for world administrative boundaries
   // Using CORS proxy to bypass CORS restrictions
@@ -47,17 +47,37 @@ export class PopulationService {
    * Fetches population data from the API and converts CSV to JSON format
    * @returns Observable of array of PopulationData objects
    */
-  getPopulationData(): Observable<PopulationData[]> {
-    return this.http.get(this.apiUrl, { responseType: 'text' }).pipe(
-      map((csvText: string) => {
-        if (!csvText || csvText.trim() === '') {
-          throw new Error('Empty response from API');
-        }
+getPopulationData(): Observable<PopulationData[]> {
+  return this.http.get(this.apiUrl, { responseType: 'text' }).pipe(
+    retry(2), // Retry up to 2 times on failure
+    map((csvText: string) => {
+      if (!csvText || csvText.trim() === '') {
+        throw new Error('Empty response from API');
+      }
+      try {
         const parsed = this.parseCsvToJson(csvText);
+        if (parsed.length === 0) {
+          console.warn('CSV parsed but resulted in empty array');
+        }
         return parsed;
-      })
-    );
-  }
+      } catch (error) {
+        console.error('Error parsing CSV:', error);
+        console.error('CSV content preview:', csvText.substring(0, 500));
+        throw error;
+      }
+    }),
+    catchError((error) => {
+      console.error('Error fetching population data:', {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        url: this.apiUrl,
+        error: error.error
+      });
+      throw new Error(`Failed to fetch population data: ${error.message || 'Network error'}`);
+    })
+  );
+}
 
   /**
    * Parses CSV text and converts it to JSON array
@@ -65,24 +85,36 @@ export class PopulationService {
    * @returns Array of parsed population data objects
    */
   private parseCsvToJson(csvText: string): PopulationData[] {
-    const lines = csvText.split('\n').filter(line => line.trim() !== '');
+    const lines = csvText
+      .replace(/\r\n/g, '\n')  // Convert Windows line endings
+      .replace(/\r/g, '\n')     // Convert Mac line endings
+      .split('\n')
+      .filter(line => line.trim() !== '');
 
     if (lines.length === 0) {
       return [];
     }
 
     // Extract header row
-    const headers = this.parseCsvLine(lines[0]);
+    const headers = this.parseCsvLine(lines[0]).map(h => h.trim().replace(/\r$/, '').replace(/\n$/, ''));;
 
-    // Find column indices
-    const countryNameIndex = headers.indexOf('Country Name');
-    const countryCodeIndex = headers.indexOf('Country Code');
-    const yearIndex = headers.indexOf('Year');
-    const valueIndex = headers.indexOf('Value\r');
+    // Find column indices with case-insensitive matching
+    const countryNameIndex = headers.findIndex(h =>
+      h.toLowerCase() === 'country name'
+    );
+    const countryCodeIndex = headers.findIndex(h =>
+      h.toLowerCase() === 'country code'
+    );
+    const yearIndex = headers.findIndex(h =>
+      h.toLowerCase() === 'year'
+    );
+    const valueIndex = headers.findIndex(h =>
+      h.toLowerCase() === 'value'
+    );
 
-    // Validate that all required columns exist
+    // Better error message if columns not found
     if (countryNameIndex === -1 || countryCodeIndex === -1 || yearIndex === -1 || valueIndex === -1) {
-      throw new Error('CSV file does not contain all required columns');
+      throw new Error(`CSV file missing required columns. Found headers: ${headers.join(', ')}`);
     }
 
     // Parse data rows
