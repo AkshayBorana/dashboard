@@ -13,9 +13,8 @@
   }
 }
 
-.chart-card,
-.table-card,
-.map-card {
+.map-card,
+.data-card {
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -23,17 +22,20 @@
   margin-bottom: 2rem;
 }
 
-.chart-card {
-  margin-top: 0;
+// Container for chart and table sections
+.charts-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-top: 2rem;
 }
 
-.table-card {
-  margin-top: 0;
+.chart-section,
+.table-section {
+  width: 100%;
 }
 
 .dropdown-section {
-  margin-bottom: 2rem;
-  padding: 0 2rem;
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -59,16 +61,16 @@
     }
   }
 
-  .chart-card,
-  .table-card,
-  .map-card {
+  .map-card,
+  .data-card {
     padding: 1rem;
-    margin-bottom: 1rem;
     border-radius: 4px;
+    margin-bottom: 1rem;
   }
 
-  .dropdown-section {
-    padding: 0 1rem;
+  .charts-table-container {
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
   .loading {
@@ -89,15 +91,15 @@
     }
   }
 
-  .chart-card,
-  .table-card,
-  .map-card {
+  .map-card,
+  .data-card {
     padding: 1.5rem;
     margin-bottom: 1.5rem;
   }
 
-  .dropdown-section {
-    padding: 0 1.5rem;
+  .charts-table-container {
+    gap: 1.5rem;
+    margin-top: 1.5rem;
   }
 }
 
@@ -111,14 +113,22 @@
     }
   }
 
-  .chart-card,
-  .table-card,
-  .map-card {
+  .map-card,
+  .data-card {
     padding: 2rem;
     margin-bottom: 2rem;
   }
 
-  .dropdown-section {
-    padding: 0 2rem;
+  // Display chart and table side by side on desktop
+  .charts-table-container {
+    flex-direction: row;
+    gap: 2rem;
+    margin-top: 2rem;
+    
+    .chart-section,
+    .table-section {
+      flex: 1;
+      width: auto;
+    }
   }
 }

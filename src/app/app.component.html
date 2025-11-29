@@ -2,33 +2,6 @@
   <div class="dashboard-container">
     <h1>Population Dashboard</h1>
     
-    <div class="dropdown-section">
-      <app-dropdown
-        [options]="dropdownOptions"
-        [selectedValue]="selectedDisplayOption()"
-        placeholder="Display population by"
-        (selectionChange)="onDisplayOptionChange($event)">
-      </app-dropdown>
-
-      @if (selectedDisplayOption() === 'country' && countryOptions().length > 0) {
-        <app-dropdown
-          [options]="countryOptions()"
-          [selectedValue]="selectedCountry()"
-          placeholder="Select a country"
-          (selectionChange)="onCountryChange($event)">
-        </app-dropdown>
-      }
-
-      @if (selectedDisplayOption() === 'year' && yearOptions().length > 0) {
-        <app-dropdown
-          [options]="yearOptions()"
-          [selectedValue]="selectedYear()"
-          placeholder="Select a year"
-          (selectionChange)="onYearChange($event)">
-        </app-dropdown>
-      }
-    </div>
-
     <div class="map-card">
       @if (allPopulationData().length > 0) {
         <app-maps 
@@ -39,25 +12,56 @@
       }
     </div>
 
-    <div class="chart-card">
-      @if (chartData().labels.length > 0) {
-        <app-chart
-          [chartData]="chartData()"
-          [title]="chartTitle()"
-          height="500px"
-          width="100%">
-        </app-chart>
-      } @else {
-        <div class="loading">Loading chart data...</div>
-      }
-    </div>
+    <div class="data-card">
+      <div class="dropdown-section">
+        <app-dropdown
+          [options]="dropdownOptions"
+          [selectedValue]="selectedDisplayOption()"
+          placeholder="Display population by"
+          (selectionChange)="onDisplayOptionChange($event)">
+        </app-dropdown>
 
-    <div class="table-card">
-      @if (tableData().length > 0) {
-        <app-table [data]="tableData()" (pageChange)="onTablePageChange($event)"></app-table>
-      } @else {
-        <div class="loading">No table data available...</div>
-      }
+        @if (selectedDisplayOption() === 'country' && countryOptions().length > 0) {
+          <app-dropdown
+            [options]="countryOptions()"
+            [selectedValue]="selectedCountry()"
+            placeholder="Select a country"
+            (selectionChange)="onCountryChange($event)">
+          </app-dropdown>
+        }
+
+        @if (selectedDisplayOption() === 'year' && yearOptions().length > 0) {
+          <app-dropdown
+            [options]="yearOptions()"
+            [selectedValue]="selectedYear()"
+            placeholder="Select a year"
+            (selectionChange)="onYearChange($event)">
+          </app-dropdown>
+        }
+      </div>
+
+      <div class="charts-table-container">
+        <div class="chart-section">
+          @if (chartData().labels.length > 0) {
+            <app-chart
+              [chartData]="chartData()"
+              [title]="chartTitle()"
+              height="500px"
+              width="100%">
+            </app-chart>
+          } @else {
+            <div class="loading">Loading chart data...</div>
+          }
+        </div>
+
+        <div class="table-section">
+          @if (tableData().length > 0) {
+            <app-table [data]="tableData()" (pageChange)="onTablePageChange($event)"></app-table>
+          } @else {
+            <div class="loading">No table data available...</div>
+          }
+        </div>
+      </div>
     </div>
   </div>
 </main>
