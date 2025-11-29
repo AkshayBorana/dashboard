@@ -5,7 +5,8 @@
   [paginator]="true"
   [rows]="10"
   [showGridlines]="true"
-  [stripedRows]="true">
+  [stripedRows]="true"
+  (onPage)="onPageChange($event)">
   <ng-template #header>
     <tr>
       <th>Country Name</th>

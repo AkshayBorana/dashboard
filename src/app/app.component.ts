@@ -33,7 +33,13 @@ export class AppComponent implements OnInit {
   yearOptions = signal<DropdownOption[]>([]);
   selectedYear = signal<string | null>(null);
 
-  // Chart data signal
+  // Chart data signal - full data
+  fullChartData = signal<{ labels: string[], values: number[] }>({
+    labels: [],
+    values: []
+  });
+
+  // Chart data signal - paginated (only 10 items)
   chartData = signal<{ labels: string[], values: number[] }>({
     labels: [],
     values: []
@@ -44,6 +50,9 @@ export class AppComponent implements OnInit {
 
   // Table data signal - filtered based on selection
   tableData = signal<PopulationData[]>([]);
+
+  // Current page for pagination (1-indexed)
+  currentPage = signal<number>(1);
 
   constructor(private populationService: PopulationService) { }
 
@@ -158,6 +167,7 @@ export class AppComponent implements OnInit {
     }
 
     if (countryData.length === 0) {
+      this.fullChartData.set({ labels: [], values: [] });
       this.chartData.set({ labels: [], values: [] });
       return;
     }
@@ -168,6 +178,7 @@ export class AppComponent implements OnInit {
       .sort((a, b) => a.year - b.year);
 
     if (filteredData.length === 0) {
+      this.fullChartData.set({ labels: [], values: [] });
       this.chartData.set({ labels: [], values: [] });
       return;
     }
@@ -178,7 +189,13 @@ export class AppComponent implements OnInit {
 
     // Update chart title
     this.chartTitle.set(`${countryName} Population (1960-2023)`);
-    this.chartData.set({ labels, values });
+    
+    // Store full chart data
+    this.fullChartData.set({ labels, values });
+    
+    // Update paginated chart data (first page)
+    this.currentPage.set(1);
+    this.updatePaginatedChartData(1);
   }
 
   /**
@@ -277,6 +294,7 @@ export class AppComponent implements OnInit {
     const yearData = data.filter(d => d.year === yearNumber);
 
     if (yearData.length === 0) {
+      this.fullChartData.set({ labels: [], values: [] });
       this.chartData.set({ labels: [], values: [] });
       return;
     }
@@ -295,8 +313,13 @@ export class AppComponent implements OnInit {
 
     // Update chart title
     this.chartTitle.set(`Population by Country (${year})`);
-    this.chartData.set({ labels, values });
-
+    
+    // Store full chart data
+    this.fullChartData.set({ labels, values });
+    
+    // Update paginated chart data (first page)
+    this.currentPage.set(1);
+    this.updatePaginatedChartData(1);
   }
 
   /**
@@ -310,5 +333,36 @@ export class AppComponent implements OnInit {
       this.processDataByYear(allData, value);
       this.processDataForTable(allData, null, parseInt(value));
     }
+  }
+
+  /**
+   * Handle table pagination change
+   */
+  onTablePageChange(event: { page: number; first: number; rows: number }): void {
+    console.log(event);
+    this.currentPage.set(event.page);
+    this.updatePaginatedChartData(event.page);
+  }
+
+  /**
+   * Update chart data based on current page (10 items per page)
+   */
+  private updatePaginatedChartData(page: number): void {
+    const fullData = this.fullChartData();
+    if (!fullData || fullData.labels.length === 0) {
+      return;
+    }
+
+    const rowsPerPage = 10;
+    const startIndex = (page - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+
+    const paginatedLabels = fullData.labels.slice(startIndex, endIndex);
+    const paginatedValues = fullData.values.slice(startIndex, endIndex);
+
+    this.chartData.set({
+      labels: paginatedLabels,
+      values: paginatedValues
+    });
   }
 }
