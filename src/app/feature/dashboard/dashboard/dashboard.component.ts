@@ -1,10 +1,11 @@
 import { Component, OnInit, signal, computed, OnDestroy } from '@angular/core';
-import { PopulationService, PopulationData } from '../../../shared/services/population.service';
+import { PopulationService } from '../../../core/services/population.service';
 import { ChartComponent } from '../../../shared/components/chart/chart.component';
 import { DropdownComponent, DropdownOption } from '../../../shared/components/dropdown/dropdown.component';
 import { TableComponent } from '../../../shared/components/table/table.component';
 import { MapsComponent } from '../../../shared/components/maps/maps.component';
 import { forkJoin, Subject } from 'rxjs';
+import { PopulationData } from '../../../core/models/population-data.model';
 
 @Component({
   selector: 'app-dashboard',

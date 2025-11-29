@@ -8,7 +8,7 @@ export const routes: Routes = [
   },
   {
     path: 'dashboard',
-    loadChildren: () => import('./feature/dashboard/dashboard.routes').then(m => m.dashboardRoutes),
+    loadChildren: () => import('./feature/dashboard/dashboard/dashboard.routes').then(m => m.dashboardRoutes),
   },
   {
     path: '**',

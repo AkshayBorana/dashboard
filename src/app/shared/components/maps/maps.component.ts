@@ -8,7 +8,7 @@ import Point from '@arcgis/core/geometry/Point';
 import SimpleFillSymbol from '@arcgis/core/symbols/SimpleFillSymbol';
 import SimpleLineSymbol from '@arcgis/core/symbols/SimpleLineSymbol';
 import Color from '@arcgis/core/Color';
-import { PopulationData } from '../../services/population.service';
+import { PopulationData } from '../../../core/models/population-data.model';
 
 @Component({
   selector: 'app-maps',
@@ -87,7 +87,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
     // Create a graphics layer for highlighting countries
     this.graphicsLayer = new GraphicsLayer();
-    
+
     // Create a graphics layer for all countries (clickable)
     // Make sure it's configured for interaction
     this.countriesLayer = new GraphicsLayer({
@@ -119,7 +119,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
         // Set up click handler for country selection
         this.setupClickHandler();
-        
+
         // Set up hover handler for cursor pointer
         this.setupHoverHandler();
 
@@ -157,7 +157,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
     // Use hitTest to find graphics at click location
     this.view.hitTest(event).then((response) => {
-      
+
       if (!response || !response.results || response.results.length === 0) {
         return;
       }
@@ -166,12 +166,12 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
       for (const result of response.results) {
         const graphic = (result as any).graphic;
         const layer = (result as any).layer;
-                
+
         // Check if this is a country graphic
         if (graphic && graphic.attributes) {
           const countryName = graphic.attributes.countryName;
           const countryCode = graphic.attributes.countryCode;
-    
+
           // If it's from countries layer or has countryName, show popup
           if (countryName && (layer === this.countriesLayer || countryName)) {
             const mapPoint = event.mapPoint;
@@ -184,7 +184,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
           }
         }
       }
-      
+
     }).catch((error) => {
       console.error('Error in hit test:', error);
     });
@@ -247,7 +247,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
     // Group population data by country to get unique countries with geo_shape
     const countryMap: { [key: string]: PopulationData } = {};
-    
+
     this.allPopulationData.forEach((data) => {
       if (data.countryName && data.geo_shape && data.geo_shape.geometry) {
         const key = data.countryName.toUpperCase();
@@ -354,12 +354,12 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
    * Show popup with total population from 1960-2023
    */
   private showCountryPopup(location: any, countryName: string, countryCode: string): void {
-    
+
     if (!this.view) {
       console.error('View not available');
       return;
     }
-    
+
     if (!this.allPopulationData || this.allPopulationData.length === 0) {
       console.error('Population data not available');
       return;
@@ -367,7 +367,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
     // Filter population data for this country from 1960 to 2023
     const countryData = this.allPopulationData.filter(
-      (data) => 
+      (data) =>
         (data.countryName === countryName || data.countryCode === countryCode) &&
         data.year >= 1960 &&
         data.year <= 2023 &&
@@ -419,7 +419,7 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
           console.error('Invalid location format:', location);
           return;
         }
-        
+
         // Set popup properties
         this.view.popup.title = countryName;
         this.view.popup.content = popupContent;
