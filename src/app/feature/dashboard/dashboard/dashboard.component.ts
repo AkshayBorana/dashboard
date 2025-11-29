@@ -1,11 +1,20 @@
-import { Component, OnInit, signal, computed, OnDestroy } from '@angular/core';
+import { Component, OnInit, signal, computed, OnDestroy, inject } from '@angular/core';
 import { PopulationService } from '../../../core/services/population.service';
+import { PopulationDataTransformerService } from '../../../core/services/population-data-transformer.service';
+import { DashboardDataService } from './dashboard-data.service';
 import { ChartComponent } from '../../../shared/components/chart/chart.component';
 import { DropdownComponent, DropdownOption } from '../../../shared/components/dropdown/dropdown.component';
 import { TableComponent } from '../../../shared/components/table/table.component';
 import { MapsComponent } from '../../../shared/components/maps/maps.component';
 import { forkJoin, Subject } from 'rxjs';
 import { PopulationData } from '../../../core/models/population-data.model';
+import {
+  extractUniqueYears,
+  extractUniqueCountryNames,
+  getFirstCountryName,
+  paginateChartData,
+  findCountryDataWithGeoInfo
+} from '../../../shared/utils/population-data.util';
 
 @Component({
   selector: 'app-dashboard',
@@ -13,10 +22,15 @@ import { PopulationData } from '../../../core/models/population-data.model';
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
-export class DashboardComponent implements OnInit, OnDestroy {
-  ngUnsubscribe$ = new Subject<void>();
 
-  dropdownOptions: DropdownOption[] = [
+export class DashboardComponent implements OnInit, OnDestroy {
+  private populationService: PopulationService = inject(PopulationService);
+  private populationDataTransformerService: PopulationDataTransformerService = inject(PopulationDataTransformerService);
+  private dashboardDataService: DashboardDataService = inject(DashboardDataService);
+
+  private ngUnsubscribe$ = new Subject<void>();
+
+  public dropdownOptions: DropdownOption[] = [
     { label: 'Country', value: 'country' },
     { label: 'Year', value: 'year' }
   ];
@@ -48,27 +62,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   // Selected country data with geo_point_2d and geo_shape for maps component
   selectedCountryData = computed(() => {
-    const country = this.selectedCountry();
-    const allData = this.allPopulationData();
-
-    if (!country || !allData || allData.length === 0) {
-      return null;
-    }
-
-    // Find the first record for the selected country that has geo_point_2d and geo_shape
-    const countryData = allData.find(d =>
-      (d.countryName === country) &&
-      d.geo_point_2d &&
-      d.geo_point_2d.lon &&
-      d.geo_point_2d.lat &&
-      d.geo_shape &&
-      d.geo_shape.geometry
-    );
-
-    return countryData || null;
+    return findCountryDataWithGeoInfo(this.allPopulationData(), this.selectedCountry());
   });
 
-  constructor(private populationService: PopulationService) { }
+  constructor() { }
 
   ngOnInit() {
     forkJoin({
@@ -76,15 +73,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
       worldBoundaries: this.populationService.getWorldBoundariesData()
     }).subscribe({
       next: ({ populationData, worldBoundaries }) => {
-        const mergedData = this.populationService.mergeDatasets(populationData, worldBoundaries);
+        const mergedData = this.populationDataTransformerService.mergeDatasets(populationData, worldBoundaries);
 
         this.allPopulationData.set(mergedData);
-        this.extractUniqueYears(mergedData);
-        const defaultCountry = this.extractUniqueCountryNames(mergedData);
+
+        // Extract unique years and countries
+        const yearOptions = extractUniqueYears(mergedData);
+        const countryOptions = extractUniqueCountryNames(mergedData);
+        this.yearOptions.set(yearOptions);
+        this.countryOptions.set(countryOptions);
+
+        // Set default country and process initial data
+        const defaultCountry = getFirstCountryName(mergedData);
         if (defaultCountry) {
           this.selectedCountry.set(defaultCountry);
-          this.processDataForChart(mergedData, defaultCountry);
-          this.processDataForTable(mergedData, defaultCountry);
+          this.updateChartData(mergedData, defaultCountry);
+          this.updateTableData(mergedData);
         }
       },
       error: (error) => {
@@ -94,108 +98,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Extract and sort unique years from the population data
+   * Update chart data based on country or year selection
    */
-  private extractUniqueYears(data: PopulationData[]): void {
-    if (!data || data.length === 0) {
-      return;
-    }
-    const uniqueYears = new Set<number>();
-    data.forEach(item => {
-      if (item.year && item.year >= 1960 && item.year <= 2023) {
-        uniqueYears.add(item.year);
-      }
-    });
-
-    const sortedYears = Array.from(uniqueYears).sort((a, b) => b - a);
-
-    const yearOptions: DropdownOption[] = sortedYears.map(year => ({
-      label: year.toString(),
-      value: year.toString()
-    }));
-
-    this.yearOptions.set(yearOptions);
+  private updateChartData(data: PopulationData[], countryName: string | null = null): void {
+    const chartData = this.dashboardDataService.processDataForChart(data, countryName);
+    this.chartTitle.set(chartData.title);
+    this.fullChartData.set({ labels: chartData.labels, values: chartData.values });
+    this.currentPage.set(1);
+    this.updatePaginatedChartData(1);
   }
 
   /**
-   * Extract unique country names from the population data
-   * Returns the first country name from the sorted list
+   * Update chart data based on year selection
    */
-  private extractUniqueCountryNames(data: PopulationData[]): string | null {
-    if (!data || data.length === 0) {
-      return null;
-    }
-
-    const uniqueCountryNames = new Set<string>();
-
-    data.forEach(item => {
-      if (item.countryName && item.countryName.trim() !== '') {
-        uniqueCountryNames.add(item.countryName);
-      }
-    });
-
-    const sortedCountryNames: string[] = Array.from(uniqueCountryNames).sort((a, b) => a.localeCompare(b)) || [];
-
-    const countryOptions: DropdownOption[] = sortedCountryNames.map(countryName => ({
-      label: countryName,
-      value: countryName
-    }));
-
-    this.countryOptions.set(countryOptions);
-
-    return sortedCountryNames.length ? sortedCountryNames[0] : null;
-  }
-
-  /**
-   * Process population data and format it for the bar chart
-   * Filters data for the specified country from 1960 to 2023
-   */
-  private processDataForChart(data: PopulationData[], countryName: string | null = null): void {
-    if (!data || data.length === 0) {
-      return;
-    }
-
-    // Filter data for the specified country
-    let countryData: PopulationData[];
-
-    if (countryName) {
-      countryData = data.filter(d =>
-        d.countryName === countryName ||
-        d.countryName.toUpperCase() === countryName?.toUpperCase()
-      );
-    } else {
-      // Default toAfghanistan
-      countryData = data.filter(d =>
-        d.countryName.toUpperCase() === 'AFGHANISTAN' ||
-        d.countryName.toUpperCase() === 'AFGHANISTAN)' ||
-        d.countryCode === 'AFG'
-      );
-      countryName = 'Afghanistan';
-    }
-
-    if (countryData.length === 0) {
-      this.fullChartData.set({ labels: [], values: [] });
-      this.chartData.set({ labels: [], values: [] });
-      return;
-    }
-
-    const filteredData = countryData
-      .filter(d => d.year >= 1960 && d.year <= 2023)
-      .sort((a, b) => a.year - b.year);
-
-    if (filteredData.length === 0) {
-      this.fullChartData.set({ labels: [], values: [] });
-      this.chartData.set({ labels: [], values: [] });
-      return;
-    }
-
-    const labels = filteredData.map(d => d.year.toString());
-    const values = filteredData.map(d => d.value);
-
-    this.chartTitle.set(`${countryName} Population (1960-2023)`);
-
-    this.fullChartData.set({ labels, values });
-
+  private updateChartDataByYear(data: PopulationData[], year: string): void {
+    const chartData = this.dashboardDataService.processDataByYear(data, year);
+    this.chartTitle.set(chartData.title);
+    this.fullChartData.set({ labels: chartData.labels, values: chartData.values });
     this.currentPage.set(1);
     this.updatePaginatedChartData(1);
   }
@@ -212,13 +131,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.selectedYear.set(null);
       const currentCountry = this.selectedCountry();
       if (currentCountry && allData.length > 0) {
-        this.processDataForTable(allData, currentCountry);
+        this.updateTableData(allData);
       }
     } else if (value === 'year') {
       this.selectedCountry.set(null);
       const currentYear = this.selectedYear();
       if (currentYear && allData.length > 0) {
-        this.processDataForTable(allData, null, parseInt(currentYear));
+        this.updateTableData(allData);
       }
     }
   }
@@ -232,92 +151,29 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Update chart and table with selected country's data
     const allData = this.allPopulationData();
     if (allData.length > 0) {
-      this.processDataForChart(allData, value);
-      this.processDataForTable(allData, value);
+      this.updateChartData(allData, value);
+      this.updateTableData(allData);
     }
   }
 
   /**
-   * Process data for table based on selected country or year
+   * Update table data based on current selections
    */
-  private processDataForTable(data: PopulationData[], countryName: string | null = null, year: number | null = null): void {
-    if (!data || data.length === 0) {
-      this.tableData.set([]);
-      return;
-    }
+  private updateTableData(data: PopulationData[]): void {
+    const displayOption = this.selectedDisplayOption() || 'country';
+    const countryName = this.selectedCountry();
+    const year = this.selectedYear() ? parseInt(this.selectedYear()!, 10) : null;
+    const defaultCountry = this.countryOptions()[0]?.value || null;
 
-    let filteredData: PopulationData[] = [];
-
-    if (this.selectedDisplayOption() === 'country' && countryName) {
-      filteredData = data
-        .filter(d =>
-          (d.countryName === countryName || d.countryName.toUpperCase() === countryName.toUpperCase()) &&
-          d.year >= 1960 &&
-          d.year <= 2023
-        )
-        .sort((a, b) => a.year - b.year);
-    } else if (this.selectedDisplayOption() === 'year' && year) {
-      filteredData = data
-        .filter(d => d.year === year)
-        .sort((a, b) => b.value - a.value);
-    } else {
-      const firstCountry = this.countryOptions()[0]?.value;
-      if (firstCountry) {
-        filteredData = data
-          .filter(d =>
-            d.countryName === firstCountry &&
-            d.year >= 1960 &&
-            d.year <= 2023
-          )
-          .sort((a, b) => a.year - b.year);
-      }
-    }
+    const filteredData = this.dashboardDataService.processDataForTable(
+      data,
+      displayOption,
+      countryName,
+      year,
+      defaultCountry
+    );
 
     this.tableData.set(filteredData);
-  }
-
-  /**
-   * Process population data by year - shows all countries for the selected year
-   */
-  private processDataByYear(data: PopulationData[], year: string): void {
-    if (!data || data.length === 0) {
-      return;
-    }
-
-    const yearNumber = parseInt(year, 10);
-    if (isNaN(yearNumber)) {
-      return;
-    }
-
-    const yearData = data.filter(d => d.year === yearNumber);
-
-    if (yearData.length === 0) {
-      this.fullChartData.set({ labels: [], values: [] });
-      this.chartData.set({ labels: [], values: [] });
-      return;
-    }
-
-    // Sort by population value (descending) to show largest countries first
-    const sortedData = yearData
-      .filter(d => d.countryName && d.countryName.trim() !== '')
-      .sort((a, b) => b.value - a.value);
-
-    // Get top countries (limit to top 50 for better visualization)
-    const topCountries = sortedData.slice(0, 50);
-
-    // Format data for chart: country names as labels, population values as values
-    const labels = topCountries.map(d => d.countryName);
-    const values = topCountries.map(d => d.value);
-
-    // Update chart title
-    this.chartTitle.set(`Population by Country (${year})`);
-
-    // Store full chart data
-    this.fullChartData.set({ labels, values });
-
-    // Update paginated chart data (first page)
-    this.currentPage.set(1);
-    this.updatePaginatedChartData(1);
   }
 
   /**
@@ -328,8 +184,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Update chart and table with selected year's data
     const allData = this.allPopulationData();
     if (allData.length > 0) {
-      this.processDataByYear(allData, value);
-      this.processDataForTable(allData, null, parseInt(value));
+      this.updateChartDataByYear(allData, value);
+      this.updateTableData(allData);
     }
   }
 
@@ -347,21 +203,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
    */
   private updatePaginatedChartData(page: number): void {
     const fullData = this.fullChartData();
-    if (!fullData || fullData.labels.length === 0) {
-      return;
-    }
-
-    const rowsPerPage = 10;
-    const startIndex = (page - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-
-    const paginatedLabels = fullData.labels.slice(startIndex, endIndex);
-    const paginatedValues = fullData.values.slice(startIndex, endIndex);
-
-    this.chartData.set({
-      labels: paginatedLabels,
-      values: paginatedValues
-    });
+    const paginatedData = paginateChartData(fullData, page, 10);
+    this.chartData.set(paginatedData);
   }
 
   ngOnDestroy(): void {
