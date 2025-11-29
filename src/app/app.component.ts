@@ -3,11 +3,12 @@ import { RouterOutlet } from '@angular/router';
 import { PopulationService, PopulationData } from './services/population.service';
 import { ChartComponent } from './shared/components/chart/chart.component';
 import { DropdownComponent, DropdownOption } from './shared/components/dropdown/dropdown.component';
+import { TableComponent } from './shared/components/table/table.component';
 import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ChartComponent, DropdownComponent],
+  imports: [RouterOutlet, ChartComponent, DropdownComponent, TableComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -41,6 +42,9 @@ export class AppComponent implements OnInit {
   // Chart title signal
   chartTitle = signal<string>('Population (1960-2023)');
 
+  // Table data signal - filtered based on selection
+  tableData = signal<PopulationData[]>([]);
+
   constructor(private populationService: PopulationService) { }
 
   ngOnInit() {
@@ -67,6 +71,7 @@ export class AppComponent implements OnInit {
         if (firstCountry) {
           this.selectedCountry.set(firstCountry);
           this.processDataForChart(mergedData, firstCountry);
+          this.processDataForTable(mergedData, firstCountry);
         }
       },
       error: (error) => {
@@ -190,12 +195,21 @@ export class AppComponent implements OnInit {
    */
   onDisplayOptionChange(value: string): void {
     this.selectedDisplayOption.set(value);
+    const allData = this.allPopulationData();
+    
     // Reset selections when switching display options
-    if (value !== 'country') {
-      this.selectedCountry.set(null);
-    }
-    if (value !== 'year') {
+    if (value === 'country') {
       this.selectedYear.set(null);
+      const currentCountry = this.selectedCountry();
+      if (currentCountry && allData.length > 0) {
+        this.processDataForTable(allData, currentCountry);
+      }
+    } else if (value === 'year') {
+      this.selectedCountry.set(null);
+      const currentYear = this.selectedYear();
+      if (currentYear && allData.length > 0) {
+        this.processDataForTable(allData, null, parseInt(currentYear));
+      }
     }
   }
 
@@ -205,11 +219,54 @@ export class AppComponent implements OnInit {
   onCountryChange(value: string): void {
     this.selectedCountry.set(value);
 
-    // Update chart with selected country's data
+    // Update chart and table with selected country's data
     const allData = this.allPopulationData();
     if (allData.length > 0) {
       this.processDataForChart(allData, value);
+      this.processDataForTable(allData, value);
     }
+  }
+
+  /**
+   * Process data for table based on selected country or year
+   */
+  private processDataForTable(data: PopulationData[], countryName: string | null = null, year: number | null = null): void {
+    if (!data || data.length === 0) {
+      this.tableData.set([]);
+      return;
+    }
+
+    let filteredData: PopulationData[] = [];
+
+    if (this.selectedDisplayOption() === 'country' && countryName) {
+      // Filter by country and year range (1960-2023)
+      filteredData = data
+        .filter(d => 
+          (d.countryName === countryName || d.countryName.toUpperCase() === countryName.toUpperCase()) &&
+          d.year >= 1960 && 
+          d.year <= 2023
+        )
+        .sort((a, b) => a.year - b.year);
+    } else if (this.selectedDisplayOption() === 'year' && year) {
+      // Filter by year - show all countries for that year
+      filteredData = data
+        .filter(d => d.year === year)
+        .sort((a, b) => b.value - a.value); // Sort by population descending
+    } else {
+      // Default: show first country's data if available
+      const firstCountry = this.countryOptions()[0]?.value;
+      if (firstCountry) {
+        filteredData = data
+          .filter(d => 
+            d.countryName === firstCountry &&
+            d.year >= 1960 && 
+            d.year <= 2023
+          )
+          .sort((a, b) => a.year - b.year);
+      }
+    }
+
+    this.tableData.set(filteredData);
   }
 
   /**
@@ -256,10 +313,11 @@ export class AppComponent implements OnInit {
    */
   onYearChange(value: string): void {
     this.selectedYear.set(value);
-    // Update chart with selected year's data
+    // Update chart and table with selected year's data
     const allData = this.allPopulationData();
     if (allData.length > 0) {
       this.processDataByYear(allData, value);
+      this.processDataForTable(allData, null, parseInt(value));
     }
   }
 }

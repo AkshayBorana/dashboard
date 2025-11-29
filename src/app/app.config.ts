@@ -11,6 +11,8 @@ import {
   LegendComponent
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { providePrimeNG } from 'primeng/config';
+import Lara from '@primeng/themes/material';
 
 // Register the required components
 echarts.use([
@@ -29,6 +31,16 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(),
-    provideEchartsCore({ echarts })
+    provideEchartsCore({ echarts }),
+    providePrimeNG({
+      theme: {
+        preset: Lara,
+        options: {
+          prefix: 'p',
+          darkModeSelector: false, // disable dark mode
+        },
+      },
+      ripple: true,
+    }),
   ]
 };

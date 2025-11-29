@@ -39,6 +39,12 @@
     } @else {
       <div class="loading">Loading chart data...</div>
     }
+
+    @if (tableData().length > 0) {
+      <div class="table-section">
+        <app-table [data]="tableData()"></app-table>
+      </div>
+    }
   </div>
 </main>
 

@@ -30,6 +30,12 @@
   font-size: 1.1rem;
 }
 
+.table-section {
+  margin-top: 3rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
 // Mobile styles (up to 767px)
 @media screen and (max-width: 767px) {
   .dashboard-container {
@@ -47,6 +53,10 @@
     padding: 1.5rem;
     font-size: 1rem;
   }
+
+  .table-section {
+    margin-top: 2rem;
+  }
 }
 
 // Tablet styles (768px to 1023px)
@@ -59,6 +69,10 @@
       font-size: 1.75rem;
       margin: 0 0 1.75rem 0;
     }
+  }
+
+  .table-section {
+    margin-top: 2.5rem;
   }
 }
 

@@ -1,0 +1,27 @@
+<p-table 
+  #dataTable
+  [value]="data()" 
+  [tableStyle]="{ 'min-width': '100%' }"
+  [paginator]="true"
+  [rows]="10"
+  [showGridlines]="true"
+  [stripedRows]="true">
+  <ng-template #header>
+    <tr>
+      <th>Country Name</th>
+      <th>Country Code</th>
+      <th>Continent</th>
+      <th>Year</th>
+      <th>Population</th>
+    </tr>
+  </ng-template>
+  <ng-template #body let-populationData>
+    <tr>
+      <td>{{ populationData.countryName }}</td>
+      <td>{{ populationData.countryCode }}</td>
+      <td>{{ populationData.continent || 'N/A' }}</td>
+      <td>{{ populationData.year }}</td>
+      <td>{{ populationData.value | number:'1.0-0' }}</td>
+    </tr>
+  </ng-template>
+</p-table>
