@@ -54,17 +54,9 @@ export class AppComponent implements OnInit {
       worldBoundaries: this.populationService.getWorldBoundariesData()
     }).subscribe({
       next: ({ populationData, worldBoundaries }) => {
-
-        console.log('Original population data:', populationData);
-        console.log('World boundaries data:', worldBoundaries);
-
         // Merge the datasets where countryCode === iso3
         const mergedData = this.populationService.mergeDatasets(populationData, worldBoundaries);
-        
-        console.log('Merged data:', mergedData);
-        console.log('Sample merged record:', mergedData.find(d => d.geo_shape));
 
-        // Handle merged population data
         this.allPopulationData.set(mergedData);
         this.extractUniqueYears(mergedData);
         const firstCountry = this.extractUniqueCountryNames(mergedData);
@@ -104,7 +96,6 @@ export class AppComponent implements OnInit {
     }));
 
     this.yearOptions.set(yearOptions);
-    console.log('Unique years extracted:', yearOptions.length);
   }
 
   /**
@@ -196,7 +187,7 @@ export class AppComponent implements OnInit {
   onDisplayOptionChange(value: string): void {
     this.selectedDisplayOption.set(value);
     const allData = this.allPopulationData();
-    
+
     // Reset selections when switching display options
     if (value === 'country') {
       this.selectedYear.set(null);
@@ -241,9 +232,9 @@ export class AppComponent implements OnInit {
     if (this.selectedDisplayOption() === 'country' && countryName) {
       // Filter by country and year range (1960-2023)
       filteredData = data
-        .filter(d => 
+        .filter(d =>
           (d.countryName === countryName || d.countryName.toUpperCase() === countryName.toUpperCase()) &&
-          d.year >= 1960 && 
+          d.year >= 1960 &&
           d.year <= 2023
         )
         .sort((a, b) => a.year - b.year);
@@ -257,9 +248,9 @@ export class AppComponent implements OnInit {
       const firstCountry = this.countryOptions()[0]?.value;
       if (firstCountry) {
         filteredData = data
-          .filter(d => 
+          .filter(d =>
             d.countryName === firstCountry &&
-            d.year >= 1960 && 
+            d.year >= 1960 &&
             d.year <= 2023
           )
           .sort((a, b) => a.year - b.year);

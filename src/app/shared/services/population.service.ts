@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { catchError, map, retry } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, map, retry, switchMap } from 'rxjs/operators';
 
 export interface PopulationData {
   countryName: string;
@@ -39,7 +39,7 @@ export class PopulationService {
 
   // OpenDataSoft API endpoint for world administrative boundaries
   // Using CORS proxy to bypass CORS restrictions
-  private readonly boundariesApiUrl = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/world-administrative-boundaries/records/?limit=100&offset=0`;
+  private readonly boundariesApiBaseUrl = `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/world-administrative-boundaries/records/`;
 
   constructor(private http: HttpClient) {}
 
@@ -186,12 +186,68 @@ getPopulationData(): Observable<PopulationData[]> {
 
   /**
    * Fetches world administrative boundaries data from OpenDataSoft API
-   * @returns Observable of the API response
+   * Handles pagination to fetch all entries using the total_count property
+   * @returns Observable of the API response with all results combined
    */
   getWorldBoundariesData(): Observable<any> {
-    return this.http.get(this.boundariesApiUrl).pipe(
-      map((responseText) => {
-        return responseText
+    const limit = 100;
+    const firstCallUrl = `${this.boundariesApiBaseUrl}?limit=${limit}&offset=0`;
+
+    // Make the first call to get initial data and total_count
+    return this.http.get<any>(firstCallUrl).pipe(
+      switchMap((firstResponse) => {
+        const totalCount = firstResponse.total_count || 0;
+        const firstResults = firstResponse.results || [];
+
+        // If we already have all the data, return it
+        if (firstResults.length >= totalCount) {
+          return of(firstResponse);
+        }
+
+        // Calculate how many additional calls are needed
+        const remainingCount = totalCount - firstResults.length;
+        const additionalCallsNeeded = Math.ceil(remainingCount / limit);
+
+        // Create an array of observables for additional calls
+        const additionalCalls: Observable<any>[] = [];
+        for (let i = 1; i <= additionalCallsNeeded; i++) {
+          const offset = i * limit;
+          const url = `${this.boundariesApiBaseUrl}?limit=${limit}&offset=${offset}`;
+          additionalCalls.push(this.http.get<any>(url));
+        }
+
+        // Execute all additional calls in parallel
+        return forkJoin(additionalCalls).pipe(
+          map((additionalResponses) => {
+            // Combine all results from additional calls
+            const allAdditionalResults: any[] = [];
+            additionalResponses.forEach((response) => {
+              if (response.results && Array.isArray(response.results)) {
+                allAdditionalResults.push(...response.results);
+              }
+            });
+
+            // Combine first results with all additional results
+            const combinedResults = [...firstResults, ...allAdditionalResults];
+
+            // Return response in the same format as the original
+            return {
+              ...firstResponse,
+              results: combinedResults,
+              total_count: totalCount
+            };
+          })
+        );
+      }),
+      catchError((error) => {
+        console.error('Error fetching world boundaries data:', {
+          message: error.message,
+          status: error.status,
+          statusText: error.statusText,
+          url: this.boundariesApiBaseUrl,
+          error: error.error
+        });
+        throw new Error(`Failed to fetch world boundaries data: ${error.message || 'Network error'}`);
       })
     );
   }
@@ -246,27 +302,16 @@ getPopulationData(): Observable<PopulationData[]> {
 
     // Merge the datasets
     const mergedData = populationData.map((popData) => {
-      const countryCode = popData.countryCode?.trim().toUpperCase();
+    const countryCode = popData.countryCode?.trim().toUpperCase();
 
       if (countryCode && boundariesMap.has(countryCode)) {
         const boundary = boundariesMap.get(countryCode);
-
-        // Create a new object with merged properties
         return {
           ...popData,
-          geo_point_2d: boundary.geo_point_2d,
-          geo_shape: boundary.geo_shape,
-          status: boundary.status,
-          color_code: boundary.color_code,
-          continent: boundary.continent,
-          region: boundary.region,
-          iso_3166_1_alpha_2_codes: boundary.iso_3166_1_alpha_2_codes,
-          french_short: boundary.french_short,
-          iso3: boundary.iso3
+          ...boundary
         };
       }
 
-      // Return original data if no match found
       return popData;
     });
 
