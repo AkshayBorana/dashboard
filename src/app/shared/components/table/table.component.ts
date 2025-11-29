@@ -1,7 +1,7 @@
 import { Component, input, ViewChild, effect, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { TableModule, Table } from 'primeng/table';
 import { CommonModule } from '@angular/common';
-import { PopulationData } from '../../../services/population.service';
+import { PopulationData } from '../../services/population.service';
 
 @Component({
   selector: 'app-table',

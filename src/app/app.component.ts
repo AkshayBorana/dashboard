@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { PopulationService, PopulationData } from './services/population.service';
+import { PopulationService, PopulationData } from './shared/services/population.service';
 import { ChartComponent } from './shared/components/chart/chart.component';
 import { DropdownComponent, DropdownOption } from './shared/components/dropdown/dropdown.component';
 import { TableComponent } from './shared/components/table/table.component';
