@@ -30,7 +30,37 @@ export class ChartComponent implements OnInit, OnDestroy, AfterViewInit {
     // Effect to update chart options when data or screen size changes
     effect(() => {
       const data = this.chartData();
-      const chartTitle = this.title();
+      let chartTitle = this.title();
+      
+      // Calculate start and end years from labels if they are years
+      const labels = data.labels;
+      if (labels && labels.length > 0) {
+        // Check if labels are numeric (years)
+        const numericLabels = labels
+          .map(label => parseInt(label.toString(), 10))
+          .filter(year => !isNaN(year) && year >= 1900 && year <= 2100);
+        
+        if (numericLabels.length > 0) {
+          const startYear = Math.min(...numericLabels);
+          const endYear = Math.max(...numericLabels);
+          
+          // Update title with actual year range
+          // If title already contains a year range pattern (YYYY-YYYY), replace it
+          const yearRangePattern = /\((\d{4})-(\d{4})\)/;
+          if (yearRangePattern.test(chartTitle)) {
+            chartTitle = chartTitle.replace(yearRangePattern, `(${startYear}-${endYear})`);
+          } else {
+            // Check if title has a single year in parentheses (for year view - don't change it)
+            const singleYearPattern = /\((\d{4})\)/;
+            if (!singleYearPattern.test(chartTitle)) {
+              // If no year pattern at all, append the year range
+              chartTitle = `${chartTitle} (${startYear}-${endYear})`;
+            }
+            // If single year pattern exists, keep the title as is (for year view)
+          }
+        }
+      }
+      
       // Read responsive signals to trigger effect on screen size change
       const mobile = this.isMobile();
       const tablet = this.isTablet();

@@ -1,14 +1,15 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { PopulationService, PopulationData } from './shared/services/population.service';
 import { ChartComponent } from './shared/components/chart/chart.component';
 import { DropdownComponent, DropdownOption } from './shared/components/dropdown/dropdown.component';
 import { TableComponent } from './shared/components/table/table.component';
+import { MapsComponent } from './shared/components/maps/maps.component';
 import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ChartComponent, DropdownComponent, TableComponent],
+  imports: [RouterOutlet, ChartComponent, DropdownComponent, TableComponent, MapsComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -53,6 +54,29 @@ export class AppComponent implements OnInit {
 
   // Current page for pagination (1-indexed)
   currentPage = signal<number>(1);
+  // Selected country data with geo_point_2d and geo_shape for maps component
+  selectedCountryData = computed(() => {
+    console.log(this.selectedCountry());
+    console.log(this.allPopulationData());
+    const country = this.selectedCountry();
+    const allData = this.allPopulationData();
+
+    if (!country || !allData || allData.length === 0) {
+      return null;
+    }
+
+    // Find the first record for the selected country that has geo_point_2d and geo_shape
+    const countryData = allData.find(d =>
+      (d.countryName === country) &&
+      d.geo_point_2d &&
+      d.geo_point_2d.lon &&
+      d.geo_point_2d.lat &&
+      d.geo_shape &&
+      d.geo_shape.geometry
+    );
+
+    return countryData || null;
+  });
 
   constructor(private populationService: PopulationService) { }
 
@@ -189,10 +213,10 @@ export class AppComponent implements OnInit {
 
     // Update chart title
     this.chartTitle.set(`${countryName} Population (1960-2023)`);
-    
+
     // Store full chart data
     this.fullChartData.set({ labels, values });
-    
+
     // Update paginated chart data (first page)
     this.currentPage.set(1);
     this.updatePaginatedChartData(1);
@@ -313,10 +337,10 @@ export class AppComponent implements OnInit {
 
     // Update chart title
     this.chartTitle.set(`Population by Country (${year})`);
-    
+
     // Store full chart data
     this.fullChartData.set({ labels, values });
-    
+
     // Update paginated chart data (first page)
     this.currentPage.set(1);
     this.updatePaginatedChartData(1);
