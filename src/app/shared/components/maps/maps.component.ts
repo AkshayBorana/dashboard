@@ -4,6 +4,7 @@ import MapView from '@arcgis/core/views/MapView';
 import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 import Graphic from '@arcgis/core/Graphic';
 import Polygon from '@arcgis/core/geometry/Polygon';
+import Point from '@arcgis/core/geometry/Point';
 import SimpleFillSymbol from '@arcgis/core/symbols/SimpleFillSymbol';
 import SimpleLineSymbol from '@arcgis/core/symbols/SimpleLineSymbol';
 import Color from '@arcgis/core/Color';
@@ -18,7 +19,6 @@ import { PopulationData } from '../../services/population.service';
 })
 export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges {
   @ViewChild('mapViewNode', { static: false }) mapViewEl!: ElementRef;
-  @Input() selectedCountryData: PopulationData | null = null;
   @Input() allPopulationData: PopulationData[] = [];
 
   private map: Map | null = null;
@@ -38,23 +38,12 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    console.log(changes);
 
     // Load all countries when allPopulationData is available
     if (changes['allPopulationData'] && this.isViewReady) {
       if (this.allPopulationData && this.allPopulationData.length > 0) {
         setTimeout(() => {
           this.loadAllCountries();
-        }, 100);
-      }
-    }
-
-    // Update map location and highlight when selectedCountryData changes
-    if (changes['selectedCountryData'] && !changes['selectedCountryData'].firstChange) {
-      if (this.isViewReady && this.selectedCountryData) {
-        // Use setTimeout to ensure change detection completes
-        setTimeout(() => {
-          this.highlightAndCenterCountry();
         }, 100);
       }
     }
@@ -100,9 +89,14 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
     this.graphicsLayer = new GraphicsLayer();
     
     // Create a graphics layer for all countries (clickable)
-    this.countriesLayer = new GraphicsLayer();
+    // Make sure it's configured for interaction
+    this.countriesLayer = new GraphicsLayer({
+      listMode: 'show',
+      visible: true
+    });
 
     // Create a new map
+    // Put countriesLayer first so it's on top and receives clicks
     this.map = new Map({
       basemap: 'streets-navigation-vector',
       layers: [this.countriesLayer, this.graphicsLayer]
@@ -125,17 +119,13 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
 
         // Set up click handler for country selection
         this.setupClickHandler();
+        
+        // Set up hover handler for cursor pointer
+        this.setupHoverHandler();
 
         // Load all countries if data is available
         if (this.allPopulationData && this.allPopulationData.length > 0) {
           this.loadAllCountries();
-        }
-
-        // Update map location and highlight if country data is already available
-        if (this.selectedCountryData) {
-          setTimeout(() => {
-            this.highlightAndCenterCountry();
-          }, 200);
         }
       }, 200);
     }).catch((error) => {
@@ -143,166 +133,102 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
     });
   }
 
-  private highlightAndCenterCountry(): void {
-    if (!this.selectedCountryData || !this.view || !this.isViewReady || !this.graphicsLayer) {
-      return;
-    }
-
-    const geoShape = this.selectedCountryData.geo_shape;
-    const geoPoint = this.selectedCountryData.geo_point_2d;
-
-    // First, highlight the country border using geo_shape
-    if (geoShape && geoShape.geometry && geoShape.geometry.coordinates) {
-      this.highlightCountryBorder();
-    }
-
-    // Then center the map on the country
-    if (geoPoint && geoPoint.lon && geoPoint.lat) {
-      // Use a small delay to ensure the graphic is added first
-      setTimeout(() => {
-        this.centerOnCountry();
-      }, 100);
-    }
-  }
-
-  private centerOnCountry(): void {
-    if (!this.view || !this.isViewReady || !this.selectedCountryData) {
-      return;
-    }
-
-    const geoPoint = this.selectedCountryData.geo_point_2d;
-    if (!geoPoint || !geoPoint.lon || !geoPoint.lat) {
-      return;
-    }
-
-    // Center the map on the country's coordinates
-    this.view.goTo({
-      center: [geoPoint.lon, geoPoint.lat],
-      zoom: 5
-    }).catch((error) => {
-      console.error('Error centering map:', error);
-    });
-  }
-
-  private highlightCountryBorder(): void {
-    if (!this.selectedCountryData || !this.graphicsLayer || !this.isViewReady) {
-      return;
-    }
-
-    const geoShape = this.selectedCountryData.geo_shape;
-    if (!geoShape || !geoShape.geometry || !geoShape.geometry.coordinates) {
-      console.warn('No valid geo_shape found for selected country');
-      return;
-    }
-
-    try {
-      // Clear existing graphics
-      this.graphicsLayer.removeAll();
-
-      // Create polygon geometry from geo_shape
-      const geometry = geoShape.geometry;
-      const geometryType = geometry.type;
-      const coordinates = geometry.coordinates;
-
-      let polygon: Polygon;
-
-      if (geometryType === 'MultiPolygon') {
-        // Handle MultiPolygon: coordinates is an array of polygons
-        // Each polygon is an array of rings, each ring is an array of [lon, lat] coordinates
-        const allRings: number[][][] = [];
-        const multiPolyCoords = coordinates as unknown as number[][][][];
-        multiPolyCoords.forEach((polygonCoords: number[][][]) => {
-          polygonCoords.forEach((ring: number[][]) => {
-            const convertedRing = ring.map((coord: number[]) => [coord[0], coord[1]]);
-            allRings.push(convertedRing);
-          });
-        });
-
-        polygon = new Polygon({
-          rings: allRings,
-          spatialReference: { wkid: 4326 } // WGS84
-        });
-      } else {
-        // Handle Polygon: coordinates is an array of rings
-        // Each ring is an array of [lon, lat] coordinates
-        const rings = (coordinates as unknown as number[][][]).map((ring: number[][]) =>
-          ring.map((coord: number[]) => [coord[0], coord[1]])
-        );
-
-        polygon = new Polygon({
-          rings: rings,
-          spatialReference: { wkid: 4326 } // WGS84
-        });
-      }
-
-      // Create highlight symbol with visible border
-      const fillSymbol = new SimpleFillSymbol({
-        color: new Color([255, 0, 0, 0.2]), // Red fill with 20% opacity
-        outline: new SimpleLineSymbol({
-          color: new Color([255, 0, 0, 1]), // Red border with full opacity
-          width: 3 // Thicker border for visibility
-        })
-      });
-
-      // Create graphic
-      const graphic = new Graphic({
-        geometry: polygon,
-        symbol: fillSymbol
-      });
-
-      // Add graphic to layer
-      this.graphicsLayer.add(graphic);
-
-      console.log('Country border highlighted:', this.selectedCountryData.countryName);
-
-      // Try to fit the view to the country boundary
-      if (this.view && this.isViewReady) {
-        setTimeout(() => {
-          if (this.view && this.isViewReady) {
-            this.view.goTo({
-              target: polygon,
-              padding: 50
-            }).catch((error) => {
-              console.warn('Error fitting view to country boundary, using center point instead');
-              // Fallback handled in centerOnCountry
-            });
-          }
-        }, 200);
-      }
-    } catch (error) {
-      console.error('Error highlighting country border:', error);
-    }
-  }
-
   /**
    * Set up click handler on the map view to detect country clicks
    */
   private setupClickHandler(): void {
+    if (!this.view || !this.countriesLayer) {
+      return;
+    }
+
+    // Use click event with improved hitTest
+    this.view.on('click', (event) => {
+      this.handleCountryClick(event);
+    });
+  }
+
+  /**
+   * Handle country click event with improved reliability
+   */
+  private handleCountryClick(event: any): void {
+    if (!this.view || !this.countriesLayer) {
+      return;
+    }
+
+    // Use hitTest to find graphics at click location
+    this.view.hitTest(event).then((response) => {
+      
+      if (!response || !response.results || response.results.length === 0) {
+        return;
+      }
+
+      // Look through all results to find a country graphic
+      for (const result of response.results) {
+        const graphic = (result as any).graphic;
+        const layer = (result as any).layer;
+                
+        // Check if this is a country graphic
+        if (graphic && graphic.attributes) {
+          const countryName = graphic.attributes.countryName;
+          const countryCode = graphic.attributes.countryCode;
+    
+          // If it's from countries layer or has countryName, show popup
+          if (countryName && (layer === this.countriesLayer || countryName)) {
+            const mapPoint = event.mapPoint;
+            if (mapPoint) {
+              this.showCountryPopup(mapPoint, countryName, countryCode);
+              return; // Exit after showing popup
+            } else {
+              console.log('No mapPoint in event');
+            }
+          }
+        }
+      }
+      
+    }).catch((error) => {
+      console.error('Error in hit test:', error);
+    });
+  }
+
+  /**
+   * Set up hover handler to change cursor to pointer when hovering over countries
+   */
+  private setupHoverHandler(): void {
     if (!this.view) {
       return;
     }
 
-    this.view.on('click', (event) => {
+    this.view.on('pointer-move', (event) => {
       if (!this.view || !this.countriesLayer) {
         return;
       }
 
-      // Query graphics at the click location
+      // Query graphics at the pointer location
       this.view.hitTest(event).then((response) => {
+        const container = this.view?.container;
+        if (!container) {
+          return;
+        }
+
         if (response.results.length > 0) {
           const result = response.results[0];
           const graphic = (result as any).graphic;
-          if (graphic && graphic.attributes) {
-            const countryName = graphic.attributes.countryName;
-            const countryCode = graphic.attributes.countryCode;
-            
-            if (countryName) {
-              this.showCountryPopup(event.mapPoint, countryName, countryCode);
-            }
+          if (graphic && graphic.attributes && graphic.attributes.countryName) {
+            // Change cursor to pointer when over a country
+            container.style.cursor = 'pointer';
+          } else {
+            container.style.cursor = 'default';
           }
+        } else {
+          // Reset cursor when not over a country
+          container.style.cursor = 'default';
         }
       }).catch((error) => {
-        console.error('Error in hit test:', error);
+        // On error, reset cursor
+        const container = this.view?.container;
+        if (container) {
+          container.style.cursor = 'default';
+        }
       });
     });
   }
@@ -401,7 +327,6 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
       }
     });
 
-    console.log(`Loaded ${Object.keys(countryMap).length} countries onto the map`);
   }
 
   /**
@@ -429,7 +354,14 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
    * Show popup with total population from 1960-2023
    */
   private showCountryPopup(location: any, countryName: string, countryCode: string): void {
-    if (!this.view || !this.allPopulationData) {
+    
+    if (!this.view) {
+      console.error('View not available');
+      return;
+    }
+    
+    if (!this.allPopulationData || this.allPopulationData.length === 0) {
+      console.error('Population data not available');
       return;
     }
 
@@ -443,7 +375,9 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
         !isNaN(data.value)
     );
 
+
     if (countryData.length === 0) {
+      console.warn('No population data found for country:', countryName);
       return;
     }
 
@@ -463,12 +397,42 @@ export class MapsComponent implements OnInit, AfterViewInit, OnDestroy, OnChange
     `;
 
     // Show popup using the view's popup
-    if (this.view && this.view.popup) {
-      this.view.popup.title = countryName;
-      this.view.popup.content = popupContent;
-      this.view.popup.open({
-        location: location
-      });
+    try {
+      if (this.view && this.view.popup) {
+        // Ensure location is a Point object
+        let popupLocation: Point;
+        if (location instanceof Point) {
+          popupLocation = location;
+        } else if (location && location.longitude !== undefined && location.latitude !== undefined) {
+          popupLocation = new Point({
+            longitude: location.longitude,
+            latitude: location.latitude,
+            spatialReference: { wkid: 4326 }
+          });
+        } else if (location && location.x !== undefined && location.y !== undefined) {
+          popupLocation = new Point({
+            x: location.x,
+            y: location.y,
+            spatialReference: location.spatialReference || { wkid: 4326 }
+          });
+        } else {
+          console.error('Invalid location format:', location);
+          return;
+        }
+        
+        // Set popup properties
+        this.view.popup.title = countryName;
+        this.view.popup.content = popupContent;
+        this.view.popup.location = popupLocation;
+        this.view.popup.visible = true;
+      } else {
+        console.error('View or popup not available', {
+          hasView: !!this.view,
+          hasPopup: !!(this.view && this.view.popup)
+        });
+      }
+    } catch (error) {
+      console.error('Error showing popup:', error);
     }
   }
 }

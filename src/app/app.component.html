@@ -30,13 +30,12 @@
     </div>
 
     <div class="map-card">
-      @if (selectedCountryData() && selectedDisplayOption() === 'country') {
+      @if (allPopulationData().length > 0) {
         <app-maps 
-          [selectedCountryData]="selectedCountryData()!" 
           [allPopulationData]="allPopulationData()">
         </app-maps>
       } @else {
-        <div class="loading">Select a country to view on map...</div>
+        <div class="loading">Loading map data...</div>
       }
     </div>
 
